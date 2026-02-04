@@ -76,8 +76,9 @@ class FaceService:
         """Get face embedding from image"""
         if not HAS_INSIGHTFACE or self.app is None:
             # Fallback for Lite Mode: return a dummy 512-dim vector
-            # Using random normal to ensure different "faces" have different (though random) identities
-            dummy_embedding = np.random.normal(0, 0.1, 512).tolist()
+            # We normalize it so L2 distance logic (threshold 0.6-1.0) works consistently
+            dummy_embedding = np.random.normal(0, 0.1, 512)
+            dummy_embedding = (dummy_embedding / np.linalg.norm(dummy_embedding)).tolist()
             return dummy_embedding, None
         
         try:
@@ -89,7 +90,14 @@ class FaceService:
             faces = sorted(faces, key=lambda x: (x.bbox[2]-x.bbox[0]) * (x.bbox[3]-x.bbox[1]), reverse=True)
             target_face = faces[0]
             
-            return target_face.embedding.tolist(), None
+            # Normalize embedding to unit length (L2 norm = 1.0)
+            # This makes the 0.6 threshold standard and highly accurate.
+            embedding = target_face.embedding
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = embedding / norm
+                
+            return embedding.tolist(), None
         except Exception as e:
             return None, f"Error processing face: {str(e)}"
 

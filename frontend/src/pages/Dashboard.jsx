@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Trash2, LogOut, Users, ShieldCheck, Camera, Activity, Search, ShieldAlert } from 'lucide-react';
+
+import { Plus, Trash2, LogOut, Users, ShieldCheck, Camera, Activity, Search, ShieldAlert, AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
     const { logout, user } = useAuth();
@@ -276,20 +277,43 @@ export default function Dashboard() {
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 ml-1 uppercase tracking-widest">Biometric Data Source</label>
-                                <div className="relative">
-                                    <input required type="file" multiple accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                        onChange={e => setImages(e.target.files)}
-                                    />
-                                    <div className="input-field h-24 flex flex-col items-center justify-center gap-2 border-dashed border-2 bg-blue-500/5 border-blue-500/20 group-hover:bg-blue-500/10 hover:border-blue-500/40 transition-all">
-                                        <Camera className="w-6 h-6 text-blue-400" />
-                                        <span className="text-xs font-bold text-blue-400/80">
-                                            {images.length > 0 ? `${images.length} Secure Fragments Selected` : "Upload Biometric Samples"}
-                                        </span>
+                            <div className="space-y-4">
+                                <label className="text-xs font-bold text-slate-400 ml-1 uppercase tracking-widest">Biometric Sampling (9-Point Precision Encoding)</label>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="relative group">
+                                        <input required type="file" multiple accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                            onChange={e => setImages(e.target.files)}
+                                        />
+                                        <div className="input-field min-h-[160px] flex flex-col items-center justify-center p-6 gap-4 border-dashed border-2 bg-blue-500/5 border-blue-500/20 group-hover:bg-blue-500/10 group-hover:border-blue-500/40 transition-all">
+                                            <div className="grid grid-cols-3 gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                {[
+                                                    'TILT LEFT', 'UP', 'TILT RIGHT',
+                                                    'LEFT 90°', 'FRONT', 'RIGHT 90°',
+                                                    'LEFT 45°', 'DOWN', 'RIGHT 45°'
+                                                ].map(pose => (
+                                                    <div key={pose} className="w-16 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-[7px] font-black text-center px-1 leading-tight border border-white/5">
+                                                        {pose}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="text-center">
+                                                <span className="text-xs font-bold text-blue-400 block mb-1">
+                                                    {images.length > 0 ? `${images.length} Secure Fragments Selected` : "Drop 9-Angle Sample Batch"}
+                                                </span>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Supports Multi-Upload (Front, Sides, Tilted, Up/Down)</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-4">
+                                        <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] text-blue-200 font-black uppercase tracking-widest">Performance Protocol</p>
+                                            <p className="text-[10px] text-blue-200/60 font-medium leading-relaxed uppercase">
+                                                For "Zero Failure" recognition, upload 9 photos covering all head rotations. This creates a full 180° biometric spatial map.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-slate-500 text-center mt-2 font-bold uppercase tracking-widest">Minimum 3 samples required for reliable encoding</p>
                             </div>
 
                             <div className="flex gap-4 pt-4">

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from app.db.session import get_db
-from app.models.models import FaceEmbedding, Staff
+from app.models.models import FaceEmbedding, Staff, HAS_PGVECTOR
 from app.services.face_service import face_service
 import numpy as np
 from app.core.config import settings
@@ -15,6 +15,9 @@ async def identify_person(file: UploadFile = File(...), db: Session = Depends(ge
     content = await file.read()
     img = face_service.process_image_bytes(content)
     
+    if img is None:
+        return {"identity": "unknown", "reason": "Invalid image file", "status": "failed"}
+    
     # Step B3: Face Quality Check
     quality = face_service.check_face_quality(img)
     if not quality["is_quality_pass"]:
@@ -25,58 +28,60 @@ async def identify_person(file: UploadFile = File(...), db: Session = Depends(ge
             "status": "rejected"
         }
     
-    # Step B4: Alignment
-    aligned_img = face_service.align_face(img)
-    
-    # Step B5: Embedding
-    embedding, error = face_service.get_embedding(aligned_img)
+    # Step B4/B5: Embedding Generation
+    # We pass the full image to InsightFace to allow it to handle alignment internally
+    # with maximum resolution, ensuring much better accuracy for side profiles.
+    embedding, error = face_service.get_embedding(img)
     
     if not embedding:
         return {"identity": "unknown", "reason": "No face detected", "status": "failed"}
     
-    # Search in DB
-    # We want to find the closest match and get the distance
-    threshold = 0.6 # Adjustable threshold for L2 distance (lower is more strict)
-    
-    # --- LITE MODE MOCK ---
-    if settings.LITE_MODE:
-        # In Lite Mode, random embeddings never match. 
-        # For testing purposes, we return the most recently enrolled person as a "Match".
-        print("LITE_MODE: Simulating match for testing...")
-        last_enrolled = db.query(Staff).order_by(Staff.id.desc()).first()
-        if last_enrolled:
-            return create_identity_response(last_enrolled, 0.15, "mock_success") # Fake low distance
-    # ----------------------
-    
+    # threshold for real models (normalized)
+    # 0.6 is strict (high security). 1.25 provides the "convenient" robustness for side angles.
+    threshold = 1.6 if settings.LITE_MODE else 1.25
+
+    match_found = False
+    result_data = None
+
     try:
-        # Try pgvector search (optimized)
-        dist_stmt = select(FaceEmbedding, FaceEmbedding.embedding.l2_distance(embedding).label("distance")) \
-                    .order_by("distance").limit(1)
-        
-        match_row = db.execute(dist_stmt).first()
-        
-        if match_row:
-            match_emb, distance = match_row
-            if distance < threshold:
-                staff = match_emb.staff
-                # Step B7/B8: Identity Decision & Track State Update
-                return create_identity_response(staff, distance, "success")
-            else:
-                return {
-                    "identity": "unknown", 
-                    "distance": float(distance), 
-                    "reason": "low_confidence",
-                    "status": "unverified",
-                    "decision": "match_above_threshold"
-                }
+        if HAS_PGVECTOR:
+            # Try pgvector search (optimized) if the model says we have it
+            dist_stmt = select(FaceEmbedding, FaceEmbedding.embedding.l2_distance(embedding).label("distance")) \
+                        .order_by("distance").limit(1)
+            
+            match_row = db.execute(dist_stmt).first()
+            
+            if match_row:
+                match_emb, distance = match_row
+                if distance < threshold:
+                    match_found = True
+                    result_data = create_identity_response(match_emb.staff, distance, "success")
+                else:
+                    result_data = {
+                        "identity": "unknown", 
+                        "distance": float(distance), 
+                        "reason": "low_confidence",
+                        "status": "unverified",
+                        "decision": "match_above_threshold"
+                    }
+        else:
+            print("HAS_PGVECTOR is False, skipping optimized vector search.")
                 
     except Exception as e:
         print(f"pgvector search failed, using Python fallback: {e}")
-        # Fallback logic remains same but returns enhanced response
+        db.rollback() 
+    
+    # FALLBACK SEARCH (Runs if no match found yet or vector search failed/skipped)
+    if not match_found and result_data is None:
         all_embeddings = db.query(FaceEmbedding).all()
         if not all_embeddings:
-             return {"identity": "unknown", "reason": "database_empty", "status": "failed"}
-             
+            return {"identity": "unknown", "reason": "database_empty", "status": "failed"}
+            
+        # Optional: Shuffle if in Lite Mode to make simulated matches more diverse
+        if settings.LITE_MODE:
+            import random
+            random.shuffle(all_embeddings)
+            
         best_match = None
         min_dist = float('inf')
         
@@ -97,6 +102,9 @@ async def identify_person(file: UploadFile = File(...), db: Session = Depends(ge
                 "reason": "low_confidence_fallback",
                 "status": "unverified"
             }
+
+    if result_data:
+        return result_data
 
     return {"identity": "unknown", "reason": "no_candidate_match", "status": "failed"}
 

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "face_db"
     
     # Toggle for Lite Mode (no pgvector/insightface required)
-    LITE_MODE: bool = True
+    LITE_MODE: bool = False
     
     # Auth
     SECRET_KEY: str = "supersecretkeywithoutproductionsecurity" # Change for prod
