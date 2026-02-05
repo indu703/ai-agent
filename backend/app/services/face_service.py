@@ -2,40 +2,32 @@ import numpy as np
 import cv2
 from typing import Optional, List
 import os
+import sys
 
-# Try to import insightface, but handle if it's not available
 try:
     import insightface
     from insightface.app import FaceAnalysis
     HAS_INSIGHTFACE = True
 except ImportError:
     HAS_INSIGHTFACE = False
-    print("Warning: insightface not installed. Face recognition features will be disabled.")
-    # Create dummy classes for type hints
     class FaceAnalysis:
-        def __init__(self, **kwargs):
-            pass
-        def prepare(self, **kwargs):
-            pass
-        def get(self, img):
-            return []
+        def __init__(self, **kwargs): pass
+        def prepare(self, **kwargs): pass
+        def get(self, img): return []
 
 class FaceService:
     def __init__(self):
         global HAS_INSIGHTFACE
         if HAS_INSIGHTFACE:
             try:
-                # Defaulting to CPU. If GPU is available, changing providers to ['CUDAExecutionProvider'] is recommended.
                 self.app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
-                self.app.prepare(ctx_id=0, det_size=(640, 640))
-                print("InsightFace model loaded successfully.")
+                self.app.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.3)
             except Exception as e:
                 print(f"Error loading InsightFace model: {e}")
                 HAS_INSIGHTFACE = False
                 self.app = None
         else:
             self.app = None
-            print("FaceService initialized without insightface - face recognition disabled")
     
     def process_image_bytes(self, file_bytes):
         """Convert bytes to OpenCV image"""
@@ -43,34 +35,99 @@ class FaceService:
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         return img
 
+    def estimate_pose(self, face) -> dict:
+        """
+        Estimate Head Pose (Yaw, Pitch) using 5 landmarks.
+        Landmarks: [RightEye, LeftEye, Nose, RightMouth, LeftMouth] (Index 0-4)
+        Note: InsightFace keypoints are usually [LeftEye, RightEye, Nose, LeftMouth, RightMouth] or similar.
+        Standard InsightFace 5-points:
+        0: Left Eye
+        1: Right Eye
+        2: Nose
+        3: Left Mouth Corner
+        4: Right Mouth Corner
+        """
+        if face is None or face.kps is None:
+            return {"yaw": 0.0, "pitch": 0.0}
+            
+        kps = face.kps
+        le, re, n, lm, rm = kps[0], kps[1], kps[2], kps[3], kps[4]
+        
+        eye_dist = np.linalg.norm(re - le) + 1e-6
+        left_dist = np.linalg.norm(n - le)
+        right_dist = np.linalg.norm(n - re)
+        
+        yaw_ratio = (right_dist - left_dist) / (eye_dist / 2)
+        yaw = yaw_ratio * 70.0
+        
+        eyes_center = (le + re) / 2
+        mouth_center = (lm + rm) / 2
+        face_height = np.linalg.norm(eyes_center - mouth_center) + 1e-6
+        
+        dist_nose_eyes = np.linalg.norm(n - eyes_center)
+        pitch_ratio = dist_nose_eyes / face_height
+        pitch = (0.5 - pitch_ratio) * 100
+        
+        return {"yaw": float(yaw), "pitch": float(pitch)}
+
     def check_face_quality(self, img) -> dict:
-        """
-        Step B3: Face Quality Check
-        Returns a dict with quality metrics.
-        In Lite Mode, we simulate a 'pass'.
-        """
-        # Calculate blur using Laplacian variance
+        """Returns a dict with quality metrics."""
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        angle = {"yaw": 0.0, "pitch": 0.0}
         
-        # Simple heuristics for angle would need landmarks (insightface)
-        # So we mock those for now
+        if HAS_INSIGHTFACE and self.app is not None:
+             faces = self.app.get(img)
+             if faces:
+                 faces = sorted(faces, key=lambda x: (x.bbox[2]-x.bbox[0]) * (x.bbox[3]-x.bbox[1]), reverse=True)
+                 angle = self.estimate_pose(faces[0])
+
         return {
-            "is_quality_pass": blur_score > 50, # Arbitrary threshold
+            "is_quality_pass": blur_score > 50,
             "blur_score": float(blur_score),
-            "angle": 0.0, # Mock
-            "occlusion": False # Mock
+            "angle": angle, 
+            "occlusion": False 
         }
 
     def align_face(self, img):
-        """
-        Step B4: Face Alignment & Normalization
-        Normalize size to 112x112 as per Step A3/B4.
-        """
-        # In real scenario, would use facial landmarks (eyes) to rotate/crop.
-        # For now, we just resize to the standard format.
+        """Normalize size to 112x112."""
         aligned_img = cv2.resize(img, (112, 112))
         return aligned_img
+
+    def get_all_embeddings(self, img):
+        """Get all face embeddings from image (for group photos)"""
+        if not HAS_INSIGHTFACE or self.app is None:
+            # Fallback for Lite Mode: return a single dummy embedding
+            emb, _ = self.get_embedding(img)
+            return [emb], None
+        
+        try:
+            faces = self.app.get(img)
+            if not faces:
+                return [], "No face detected"
+            
+            for face in faces:
+                bbox = face.bbox
+                area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+                face.area_calculated = float(area)
+            
+            faces = sorted(faces, key=lambda x: x.area_calculated, reverse=True)[:10]
+            
+            results = []
+            for face in faces:
+                embedding = face.embedding
+                norm = np.linalg.norm(embedding)
+                if norm > 0:
+                    embedding = embedding / norm
+                
+                results.append({
+                    "embedding": embedding.tolist(),
+                    "area": face.area_calculated
+                })
+                
+            return results, None
+        except Exception as e:
+            return [], f"Error processing faces: {str(e)}"
 
     def get_embedding(self, img):
         """Get face embedding from image"""
@@ -86,12 +143,9 @@ class FaceService:
             if not faces:
                 return None, "No face detected"
             
-            # Sort by area to get the largest face (main subject)
             faces = sorted(faces, key=lambda x: (x.bbox[2]-x.bbox[0]) * (x.bbox[3]-x.bbox[1]), reverse=True)
             target_face = faces[0]
             
-            # Normalize embedding to unit length (L2 norm = 1.0)
-            # This makes the 0.6 threshold standard and highly accurate.
             embedding = target_face.embedding
             norm = np.linalg.norm(embedding)
             if norm > 0:
@@ -100,6 +154,45 @@ class FaceService:
             return embedding.tolist(), None
         except Exception as e:
             return None, f"Error processing face: {str(e)}"
+
+    def analyze_face(self, img):
+        """
+        Get embedding and pose for enrollment.
+        Returns (data, error)
+        data = { "embedding": [], "pose": {"yaw": 0, "pitch": 0} }
+        """
+        if not HAS_INSIGHTFACE or self.app is None:
+            # Reuse get_embedding fallback logic
+            emb, err = self.get_embedding(img)
+            return {
+                "embedding": emb,
+                "pose": {"yaw": 0.0, "pitch": 0.0} # Mock pose
+            }, None
+            
+        try:
+            faces = self.app.get(img)
+            if not faces:
+                return None, "No face detected"
+            
+            # Largest face
+            faces = sorted(faces, key=lambda x: (x.bbox[2]-x.bbox[0]) * (x.bbox[3]-x.bbox[1]), reverse=True)
+            target_face = faces[0]
+            
+            # Embedding
+            embedding = target_face.embedding
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = embedding / norm
+            
+            # Pose
+            pose = self.estimate_pose(target_face)
+            
+            return {
+                "embedding": embedding.tolist(),
+                "pose": pose
+            }, None
+        except Exception as e:
+            return None, f"Error analyzing face: {str(e)}"
 
     def detect_all(self, img):
         """Detect all faces in image"""

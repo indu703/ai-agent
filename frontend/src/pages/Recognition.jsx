@@ -78,7 +78,6 @@ const Recognition = () => {
   const captureAndIdentify = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || isProcessing) return;
 
-    // Step B1: Context Trigger Check (Cooldown)
     const now = Date.now();
     if (
       recognitionResult?.identity === "known" &&
@@ -293,95 +292,188 @@ const Recognition = () => {
             <div className="absolute -top-12 -right-12 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/10 transition-all duration-500" />
 
             {!recognitionResult ? (
-              <div className="space-y-6 animate-pulse">
-                <div className="w-32 h-32 bg-slate-800/50 rounded-3xl flex items-center justify-center mx-auto border-2 border-dashed border-slate-700">
-                  <User className="w-12 h-12 text-slate-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-500 uppercase tracking-widest">
-                    Awaiting Identity
-                  </h3>
-                  <p className="text-sm text-slate-600 mt-2 font-medium">
-                    Position Subject in Frame
-                  </p>
-                </div>
-              </div>
-            ) : recognitionResult.identity === "known" ? (
-              <div className="space-y-8 w-full animate-fade-in">
-                <div className="relative mx-auto">
-                  <div className="w-36 h-36 bg-green-500/10 rounded-3xl flex items-center justify-center mx-auto border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] ring-1 ring-green-500/20">
-                    <div className="absolute inset-2 border-2 border-green-500/20 rounded-2xl animate-pulse" />
-                    <User className="w-16 h-16 text-green-400" />
-                  </div>
-                  <div className="absolute -bottom-3 -right-3 bg-green-500 rounded-2xl p-2 border-[6px] border-slate-900 shadow-xl">
-                    <ShieldCheck className="w-7 h-7 text-slate-950" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-green-400 uppercase tracking-[0.3em] mb-3">
-                    Identity Verified
-                  </p>
-                  <h3 className="text-4xl font-bold text-white tracking-tight">
-                    {recognitionResult.name}
-                  </h3>
-                  <div className="flex flex-col items-center gap-2 pt-2">
-                    <div className="flex gap-2">
-                      <span className="px-4 py-1 bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 rounded-full text-[10px] uppercase tracking-widest">
-                        {recognitionResult.role}
-                      </span>
-                      <span className="px-4 py-1 bg-slate-500/10 text-slate-400 font-bold border border-slate-500/20 rounded-full text-[10px] uppercase tracking-widest">
-                        ID: {recognitionResult.staff_id}
-                      </span>
+              isProcessing ? (
+                <div className="space-y-6 animate-pulse">
+                  <div className="relative mx-auto">
+                    <div className="w-32 h-32 bg-blue-500/10 rounded-3xl flex items-center justify-center mx-auto border border-blue-500/30 shadow-[0_0_40px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20">
+                      <div className="absolute inset-2 border-2 border-blue-500/20 border-t-blue-500 rounded-2xl animate-spin" />
+                      <Activity className="w-12 h-12 text-blue-400 animate-pulse" />
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/5">
-                  <div className="p-4 bg-slate-900/50 text-left">
-                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
-                      Decision
-                    </p>
-                    <p className="font-bold text-blue-400 text-xs uppercase">
-                      {recognitionResult.decision_type || "Verified"}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-slate-900/50 text-left">
-                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
-                      Match Score
-                    </p>
-                    <p className="font-bold text-slate-200">
-                      {((1 - recognitionResult.distance) * 100).toFixed(1)}%
+                  <div>
+                    <h3 className="text-xl font-bold text-blue-400 uppercase tracking-widest animate-pulse">
+                      Processing Biometrics
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-2 font-medium font-mono">
+                      Analyzing Facial Features...
                     </p>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-6 animate-pulse">
+                  <div className="w-32 h-32 bg-slate-800/50 rounded-3xl flex items-center justify-center mx-auto border-2 border-dashed border-slate-700">
+                    <User className="w-12 h-12 text-slate-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-500 uppercase tracking-widest">
+                      Awaiting Identity
+                    </h3>
+                    <p className="text-sm text-slate-600 mt-2 font-medium">
+                      Position Subject in Frame
+                    </p>
+                  </div>
+                </div>
+              )) : (
+              <div className="relative w-full">
+                {isProcessing && (
+                  <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-3xl border border-blue-500/20 animate-fade-in">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 rounded-full border border-blue-500/30">
+                      <Activity className="w-4 h-4 text-blue-400 animate-pulse" />
+                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Re-Scanning...</span>
+                    </div>
+                  </div>
+                )}
+                {recognitionResult.identity === "known" ? (
+                  <div className="space-y-8 w-full animate-fade-in">
+                    <div className="relative mx-auto">
+                      <div className="w-36 h-36 bg-green-500/10 rounded-3xl flex items-center justify-center mx-auto border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.15)] ring-1 ring-green-500/20">
+                        <div className="absolute inset-2 border-2 border-green-500/20 rounded-2xl animate-pulse" />
+                        <User className="w-16 h-16 text-green-400" />
+                      </div>
+                      <div className="absolute -bottom-3 -right-3 bg-green-500 rounded-2xl p-2 border-[6px] border-slate-900 shadow-xl">
+                        <ShieldCheck className="w-7 h-7 text-slate-950" />
+                      </div>
+                    </div>
 
-                <div className="py-2.5 bg-green-500/10 text-green-400 text-xs rounded-xl font-bold uppercase tracking-widest border border-green-500/20 shadow-lg shadow-green-950/20">
-                  Step B9: Access Granted
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-8 animate-fade-in w-full">
-                <div className="w-32 h-32 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.1)] ring-1 ring-red-500/20">
-                  <div className="absolute inset-2 border-2 border-red-500/10 rounded-2xl" />
-                  <UserX className="w-14 h-14 text-red-500" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-white tracking-tight">
-                    Access Protocol Failure
-                  </h3>
-                  <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[240px] mx-auto">
-                    Subject identity not found in administrative records.
-                  </p>
-                </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-green-400 uppercase tracking-[0.3em] mb-3">
+                          Identity Verified
+                        </p>
+                        <h3 className="text-4xl font-bold text-white tracking-tight">
+                          {recognitionResult.name}
+                        </h3>
+                        <div className="flex flex-col items-center gap-2 pt-2">
+                          <div className="flex gap-2">
+                            <span className="px-4 py-1 bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 rounded-full text-[10px] uppercase tracking-widest">
+                              {recognitionResult.role}
+                            </span>
+                            <span className="px-4 py-1 bg-slate-500/10 text-slate-400 font-bold border border-slate-500/20 rounded-full text-[10px] uppercase tracking-widest">
+                              ID: {recognitionResult.staff_id}
+                            </span>
+                          </div>
+                          {recognitionResult.is_low_confidence && (
+                            <div className="mt-4 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2 animate-pulse">
+                              <ShieldAlert className="w-4 h-4 text-amber-500" />
+                              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                                Low Confidence Match
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="py-2.5 bg-red-500/10 text-red-500 text-xs rounded-xl font-bold uppercase tracking-widest border border-red-500/20 shadow-lg shadow-red-950/20">
-                  Restriction Active
-                </div>
+                    <div className="grid grid-cols-2 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                      <div className="p-4 bg-slate-900/50 text-left">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
+                          Decision
+                        </p>
+                        <p className="font-bold text-blue-400 text-xs uppercase">
+                          {recognitionResult.decision_type || "Verified"}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-slate-900/50 text-left">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
+                          Match Score
+                        </p>
+                        <p className="font-bold text-slate-200">
+                          {recognitionResult.distance !== undefined ?
+                            Math.max(0, (1 - (Math.pow(recognitionResult.distance, 2) / 2)) * 100).toFixed(1) + '%' :
+                            'N/A'}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2 justify-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-                  <ShieldAlert className="w-3 h-3" /> Report Logged
-                </div>
+                    <div className="py-2.5 bg-green-500/10 text-green-400 text-xs rounded-xl font-bold uppercase tracking-widest border border-green-500/20 shadow-lg shadow-green-950/20">
+                      Access Granted
+                    </div>
+                  </div>
+                ) : recognitionResult.candidate_name ? (
+                  <div className="space-y-8 w-full animate-fade-in">
+                    <div className="relative mx-auto">
+                      <div className="w-36 h-36 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20">
+                        <div className="absolute inset-2 border-2 border-amber-500/20 rounded-2xl animate-pulse" />
+                        <User className="w-16 h-16 text-amber-500" />
+                      </div>
+                      <div className="absolute -bottom-3 -right-3 bg-amber-500 rounded-2xl p-2 border-[6px] border-slate-900 shadow-xl">
+                        <ShieldAlert className="w-7 h-7 text-slate-950" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 text-center">
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-amber-500 uppercase tracking-[0.3em] mb-3">
+                          Possible Match
+                        </p>
+                        <h3 className="text-3xl font-bold text-white tracking-tight">
+                          {recognitionResult.candidate_name}?
+                        </h3>
+                        <p className="text-slate-500 text-xs font-medium  max-w-[200px] mx-auto">
+                          Low confidence score detected. Manual verification suggested.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-px bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                      <div className="p-4 bg-slate-900/50 text-left">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
+                          Confidence
+                        </p>
+                        <p className="font-bold text-amber-500 text-xs uppercase">
+                          Uncertain
+                        </p>
+                      </div>
+                      <div className="p-4 bg-slate-900/50 text-left">
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1 font-mono">
+                          Match Score
+                        </p>
+                        <p className="font-bold text-slate-200">
+                          {recognitionResult.distance !== undefined ?
+                            Math.max(0, (1 - (Math.pow(recognitionResult.distance, 2) / 2)) * 100).toFixed(1) + '%' :
+                            'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="py-2.5 bg-amber-500/10 text-amber-500 text-xs rounded-xl font-bold uppercase tracking-widest border border-amber-500/20">
+                      Access Restricted (Retry Suggested)
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-8 animate-fade-in w-full">
+                    <div className="w-32 h-32 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.1)] ring-1 ring-red-500/20">
+                      <div className="absolute inset-2 border-2 border-red-500/10 rounded-2xl" />
+                      <UserX className="w-14 h-14 text-red-500" />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-bold text-white tracking-tight">
+                        Access Protocol Failure
+                      </h3>
+                      <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[240px] mx-auto">
+                        Subject identity not found in administrative records.
+                      </p>
+                    </div>
+
+                    <div className="py-2.5 bg-red-500/10 text-red-500 text-xs rounded-xl font-bold uppercase tracking-widest border border-red-500/20 shadow-lg shadow-red-950/20">
+                      Restriction Active
+                    </div>
+
+                    <div className="flex items-center gap-2 justify-center text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                      <ShieldAlert className="w-3 h-3" /> Report Logged
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

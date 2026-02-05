@@ -19,6 +19,7 @@ export default function Dashboard() {
     });
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [formError, setFormError] = useState(null);
 
     useEffect(() => {
         fetchStaff();
@@ -46,6 +47,7 @@ export default function Dashboard() {
     const handleEnroll = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setFormError(null);
         try {
             const data = new FormData();
             data.append('staff_id', formData.staff_id);
@@ -62,6 +64,11 @@ export default function Dashboard() {
             fetchStaff();
         } catch (err) {
             console.error(err);
+            if (err.response && err.response.data && err.response.data.detail) {
+                setFormError(err.response.data.detail);
+            } else {
+                setFormError("Enrollment failed. Please try again.");
+            }
         } finally {
             setLoading(false);
         }
@@ -247,7 +254,20 @@ export default function Dashboard() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleEnroll} className="space-y-6">
+                        <form onSubmit={handleEnroll} className="space-y-6 relative">
+                            {loading && (
+                                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/60 backdrop-blur-md rounded-2xl border border-blue-500/20 animate-fade-in">
+                                    <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 border border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.15)]">
+                                        <Activity className="w-10 h-10 text-blue-400 animate-pulse" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-blue-400 uppercase tracking-[0.2em] animate-pulse">
+                                        Analyzing Biometrics
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-2 font-mono uppercase tracking-widest">
+                                        Encoding Identity Hash...
+                                    </p>
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 ml-1 uppercase tracking-widest">Internal ID</label>
@@ -285,34 +305,38 @@ export default function Dashboard() {
                                             onChange={e => setImages(e.target.files)}
                                         />
                                         <div className="input-field min-h-[160px] flex flex-col items-center justify-center p-6 gap-4 border-dashed border-2 bg-blue-500/5 border-blue-500/20 group-hover:bg-blue-500/10 group-hover:border-blue-500/40 transition-all">
-                                            <div className="grid grid-cols-3 gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                            <div className="grid grid-cols-5 gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
                                                 {[
-                                                    'TILT LEFT', 'UP', 'TILT RIGHT',
-                                                    'LEFT 90°', 'FRONT', 'RIGHT 90°',
-                                                    'LEFT 45°', 'DOWN', 'RIGHT 45°'
+                                                    'FRONT', 'LEFT', 'RIGHT', 'UP', 'DOWN'
                                                 ].map(pose => (
-                                                    <div key={pose} className="w-16 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-[7px] font-black text-center px-1 leading-tight border border-white/5">
+                                                    <div key={pose} className="w-12 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-[8px] font-black text-center px-1 leading-tight border border-white/5">
                                                         {pose}
                                                     </div>
                                                 ))}
                                             </div>
                                             <div className="text-center">
                                                 <span className="text-xs font-bold text-blue-400 block mb-1">
-                                                    {images.length > 0 ? `${images.length} Secure Fragments Selected` : "Drop 9-Angle Sample Batch"}
+                                                    {images.length > 0 ? `${images.length} Files Selected` : "Select 5+ Photos"}
                                                 </span>
-                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Supports Multi-Upload (Front, Sides, Tilted, Up/Down)</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Required: Front, Left, Right, Up, Down</p>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-start gap-4">
                                         <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                                         <div className="space-y-1">
-                                            <p className="text-[10px] text-blue-200 font-black uppercase tracking-widest">Performance Protocol</p>
+                                            <p className="text-[10px] text-blue-200 font-black uppercase tracking-widest">Strict Protocol Enforced</p>
                                             <p className="text-[10px] text-blue-200/60 font-medium leading-relaxed uppercase">
-                                                For "Zero Failure" recognition, upload 9 photos covering all head rotations. This creates a full 180° biometric spatial map.
+                                                Enrollment will be REJECTED if any angle is missing. Ensure you upload at least one clear photo for each: Front, Left Profile, Right Profile, Look Up, Look Down.
                                             </p>
                                         </div>
                                     </div>
+                                    {formError && (
+                                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-start gap-3">
+                                            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                                            <p className="text-xs text-red-300 font-medium leading-relaxed">{formError}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
